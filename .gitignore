@@ -34,11 +34,17 @@ dist-ssr/
 backend/.env
 backend/.env.*
 backend/*.env
+backend/.env.backup
 
 # Frontend Environment
 frontend/.env
 frontend/.env.*
 frontend/*.env
+frontend/.env.backup
+
+# All backup environment files
+*.env.backup
+*.env.bak
 
 # IDEs
 .vscode/
