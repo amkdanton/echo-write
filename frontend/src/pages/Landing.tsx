@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import { 
   SparklesIcon, 
   RocketLaunchIcon,
@@ -256,7 +257,6 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [agencyName, setAgencyName] = useState('')
-  const navigate = useNavigate()
   const { signUp, signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {

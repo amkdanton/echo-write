@@ -36,7 +36,7 @@ app.add_middleware(
 # Add trusted host middleware for production
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", "*.vercel.app"]
+    allowed_hosts=["localhost", "127.0.0.1", "*.vercel.app", "*.onrender.com"]
 )
 
 # Include API routers
