@@ -1,0 +1,38 @@
+# FastAPI Core (Minimal versions for MVP)
+fastapi>=0.100.0
+uvicorn>=0.20.0
+pydantic>=2.0.0
+email-validator>=2.0.0
+python-multipart>=0.0.6
+
+# Database & Auth
+supabase==2.0.2
+# Note: psycopg2 removed - Supabase handles database connections
+
+# AI & Content Processing (Simplified for MVP)
+openai>=1.0.0
+# anthropic>=0.7.0  # Will add later
+feedparser>=6.0.0
+beautifulsoup4>=4.12.0
+# Note: Complex packages removed for MVP to avoid compilation issues
+
+# Background Tasks & Scheduling (Simplified for MVP)
+# celery==5.3.4  # Will add later when needed
+# redis==5.0.1   # Will add later when needed
+apscheduler==3.10.4
+
+# Email & External APIs
+resend>=0.7.0
+httpx>=0.24.0,<0.25.0  # Compatible with supabase
+
+# Utilities (Minimal for MVP)
+python-dotenv>=1.0.0
+PyJWT>=2.8.0  # For JWT token handling
+# pytz==2023.3  # Will add later
+# python-jose[cryptography]==3.3.0  # Will add later
+# passlib[bcrypt]==1.7.4  # Will add later
+
+# Development (Optional)
+# pytest==7.4.3  # Will add later
+# black==23.11.0  # Will add later
+# flake8==6.1.0  # Will add later
