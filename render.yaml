@@ -39,11 +39,8 @@ services:
         sync: false # Set this to your frontend URL after frontend is deployed
 
   # Frontend Service (React + Vite)
-  - type: web
+  - type: static
     name: echowrite-frontend
-    runtime: static
-    region: oregon
-    plan: starter # Free tier available
     branch: main
     rootDir: frontend
     buildCommand: npm install && npm run build
