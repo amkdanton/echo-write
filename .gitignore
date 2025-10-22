@@ -30,6 +30,16 @@ dist-ssr/
 .env.production.local
 *.local
 
+# Backend Environment
+backend/.env
+backend/.env.*
+backend/*.env
+
+# Frontend Environment
+frontend/.env
+frontend/.env.*
+frontend/*.env
+
 # IDEs
 .vscode/
 .idea/
