@@ -38,20 +38,14 @@ services:
       - key: CORS_ORIGINS
         sync: false # Set this to your frontend URL after frontend is deployed
 
-  # Frontend Service (React + Vite)
-  - type: static
+  # Frontend Service (React + Vite) - Static Site
+  - type: web
     name: echowrite-frontend
+    env: static
     branch: main
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
     routes:
       - type: rewrite
         source: /*
