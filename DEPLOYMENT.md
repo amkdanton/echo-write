@@ -37,6 +37,7 @@ This guide walks you through deploying EchoWrite as a monorepo on Render.
 5. Click **"Apply"**
 
 Render will create:
+
 - ✅ `echowrite-backend` - Python web service
 - ✅ `echowrite-frontend` - Static site
 
@@ -85,7 +86,7 @@ VITE_API_URL=https://echowrite-backend.onrender.com/api/v1
 
 Now that frontend is deployed:
 
-1. Go back to **echowrite-backend** 
+1. Go back to **echowrite-backend**
 2. Update the `CORS_ORIGINS` variable with your actual frontend URL
 3. Save and let it redeploy
 
@@ -133,6 +134,7 @@ If you prefer manual setup instead of Blueprint:
 Visit: `https://echowrite-backend.onrender.com/api/v1/health`
 
 You should see:
+
 ```json
 {
   "status": "healthy",
@@ -152,16 +154,19 @@ You should see the EchoWrite landing page.
 ## 📊 Cost Breakdown
 
 ### Free Tier (Development)
+
 - **Backend**: Free (spins down after 15 min inactivity)
 - **Frontend**: Free (always on)
 - **Total**: $0/month
 
 ### Starter Tier (Production Recommended)
+
 - **Backend**: $7/month (always on, 512 MB RAM)
 - **Frontend**: Free (always on)
 - **Total**: $7/month
 
 ### Pro Tier (Scale)
+
 - **Backend**: $25/month (2 GB RAM, autoscaling)
 - **Frontend**: Free
 - **Total**: $25/month
@@ -173,16 +178,19 @@ You should see the EchoWrite landing page.
 ### Backend Won't Start
 
 **Check logs:**
+
 1. Go to backend service
 2. Click **"Logs"** tab
 3. Look for errors
 
 **Common issues:**
+
 - Missing environment variables
 - Python version mismatch
 - Dependency installation failures
 
 **Fix:**
+
 ```bash
 # Ensure Python version in render.yaml matches
 PYTHON_VERSION=3.11.0
@@ -191,10 +199,12 @@ PYTHON_VERSION=3.11.0
 ### Frontend Build Fails
 
 **Common issues:**
+
 - Missing VITE_API_URL
 - Node version mismatch
 
 **Fix:**
+
 ```bash
 # Set Node version
 NODE_VERSION=18.17.0
@@ -203,6 +213,7 @@ NODE_VERSION=18.17.0
 ### CORS Errors
 
 **Fix:**
+
 1. Go to backend service
 2. Update CORS_ORIGINS to include your frontend URL:
    ```
@@ -212,6 +223,7 @@ NODE_VERSION=18.17.0
 ### Database Connection Issues
 
 **Check Supabase:**
+
 1. Verify SUPABASE_URL is correct
 2. Ensure RLS policies are set up
 3. Check service role key has proper permissions
@@ -235,15 +247,18 @@ Both services will automatically rebuild and redeploy!
 ## 🔐 Security Best Practices
 
 ### Environment Variables
+
 - ✅ Never commit `.env` files
 - ✅ Use Render's environment variables dashboard
 - ✅ Rotate API keys regularly
 
 ### CORS Configuration
+
 - ✅ Only allow your frontend domain
 - ✅ Remove localhost from production CORS
 
 ### Database
+
 - ✅ Use Supabase RLS policies
 - ✅ Never use service role key in frontend
 
@@ -252,11 +267,13 @@ Both services will automatically rebuild and redeploy!
 ## 📈 Monitoring & Logs
 
 ### View Logs
+
 1. Go to service in Render dashboard
 2. Click **"Logs"** tab
 3. Real-time streaming logs available
 
 ### Metrics
+
 1. Click **"Metrics"** tab
 2. View CPU, Memory, Request count
 3. Set up alerts for downtime
@@ -320,4 +337,3 @@ If using free tier (backend spins down):
 
 Backend: `https://echowrite-backend.onrender.com`  
 Frontend: `https://echowrite-frontend.onrender.com`
-
