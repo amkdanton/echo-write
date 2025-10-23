@@ -12,6 +12,7 @@ from openai import AsyncOpenAI
 from app.core.database import get_supabase, get_user_supabase
 from app.core.trends.service import TrendService
 from app.core.style.service import StyleService
+from app.core.generation.templates import NewsletterTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,34 @@ class GenerationService:
             logger.warning('OPENAI_API_KEY not set - generation will fail')
         self.openai_client = AsyncOpenAI(api_key=api_key) if api_key else None
     
+    async def check_user_credits(self, user_id: str) -> Dict[str, Any]:
+        """Check if user has enough credits for generation"""
+        try:
+            result = self.supabase.rpc('user_has_credits', {
+                'user_uuid': user_id,
+                'required_credits': 1
+            }).execute()
+            
+            has_credits = result.data if result.data is not None else False
+            
+            # Get current credit count
+            profile_result = self.supabase.table('user_profiles').select('credits, total_generations').eq('id', user_id).execute()
+            profile = profile_result.data[0] if profile_result.data else {}
+            
+            return {
+                "has_credits": has_credits,
+                "current_credits": profile.get('credits', 0),
+                "total_generations": profile.get('total_generations', 0)
+            }
+        except Exception as e:
+            logger.error(f"Error checking user credits: {e}")
+            return {
+                "has_credits": False,
+                "current_credits": 0,
+                "total_generations": 0,
+                "error": str(e)
+            }
+
     async def generate_newsletter(
         self,
         user_id: str,
@@ -48,6 +77,18 @@ class GenerationService:
         try:
             if not self.openai_client:
                 raise ValueError('OpenAI API key not configured')
+            
+            # 0. Check user credits first
+            logger.info(f"Checking credits for user {user_id}")
+            credit_check = await self.check_user_credits(user_id)
+            if not credit_check["has_credits"]:
+                return {
+                    "success": False,
+                    "error": "insufficient_credits",
+                    "message": f"You need at least 1 credit to generate a newsletter. You currently have {credit_check['current_credits']} credits.",
+                    "current_credits": credit_check["current_credits"],
+                    "total_generations": credit_check["total_generations"]
+                }
             
             # 1. Get top trending items
             logger.info(f"Fetching top {num_items} trending items for user {user_id}")
@@ -66,7 +107,7 @@ class GenerationService:
             # 2. Get user's voice profile
             logger.info(f"Fetching voice profile for user {user_id}")
             voice_profile = await self.style_service.get_voice_profile(user_id)
-            voice_traits = voice_profile.get('voice_traits', [])
+            voice_traits = voice_profile.get('traits', [])
             
             # 3. Get trending keywords for insights section
             trending_keywords = await self.trend_service.get_trending_keywords(
@@ -74,11 +115,12 @@ class GenerationService:
                 limit=5
             )
             
-            # 4. Build the prompt
-            prompt = self._build_generation_prompt(
+            # 4. Build the prompt using standardized template
+            prompt = NewsletterTemplate.build_generation_prompt(
                 trending_items=trending_items,
                 voice_traits=voice_traits,
-                trending_keywords=trending_keywords
+                trending_keywords=trending_keywords,
+                newsletter_title=title
             )
             
             # 5. Generate newsletter title if not provided
@@ -92,17 +134,32 @@ class GenerationService:
             logger.info("Generating newsletter with OpenAI")
             newsletter_md = await self._generate_with_llm(prompt)
             
+            # 7. Validate and parse newsletter structure
+            validation = NewsletterTemplate.validate_newsletter_structure(newsletter_md)
+            sections = NewsletterTemplate.parse_newsletter_sections(newsletter_md)
+            
+            # 8. Generate email subject
+            email_subject = NewsletterTemplate.generate_email_subject(
+                newsletter_title=draft_title,
+                trending_topics=[kw.get('keyword', '') for kw in trending_keywords[:3]],
+                user_name=None  # Could be fetched from user profile
+            )
+            
             draft_data = {
                 'user_id': user_id,
                 'title': draft_title,
                 'body_md': newsletter_md,
                 'status': 'draft',
+                'credits_used': 1,  # Track credit usage
                 'generation_metadata': {
                     'item_count': len(trending_items),
                     'time_window_hours': time_window_hours,
                     'voice_traits': voice_traits,
                     'model': 'gpt-4',
-                    'generated_at': datetime.utcnow().isoformat()
+                    'generated_at': datetime.utcnow().isoformat(),
+                    'email_subject': email_subject,
+                    'sections': sections,
+                    'validation': validation
                 },
                 'created_at': datetime.utcnow().isoformat()
             }
@@ -129,8 +186,13 @@ class GenerationService:
                 'draft_id': draft_id,
                 'title': draft_title,
                 'body_md': newsletter_md,
+                'email_subject': email_subject,
                 'items_included': len(trending_items),
-                'word_count': len(newsletter_md.split())
+                'word_count': len(newsletter_md.split()),
+                'sections': sections,
+                'validation': validation,
+                'credits_remaining': credit_check["current_credits"] - 1,
+                'credits_used': 1
             }
             
         except Exception as e:
@@ -360,7 +422,7 @@ Generate ONE title only, no quotes or explanations:"""
             
             # Get voice profile
             voice_profile = await self.style_service.get_voice_profile(user_id)
-            voice_traits = voice_profile.get('voice_traits', [])
+            voice_traits = voice_profile.get('traits', [])
             
             # Get trending keywords
             trending_keywords = await self.trend_service.get_trending_keywords(user_id, limit=5)
@@ -451,7 +513,7 @@ Generate ONE title only, no quotes or explanations:"""
             logger.error(f"Error listing drafts: {str(e)}")
             raise
     
-    async def delete_draft(self, user_id: str, draft_id: str) -> Dict[str, Any]:
+    async def delete_draft(self, draft_id: str, user_id: str) -> Dict[str, Any]:
         """Delete a draft."""
         try:
             response = self.supabase.table('drafts').delete().eq('id', draft_id).eq('user_id', user_id).execute()

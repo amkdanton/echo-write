@@ -86,10 +86,14 @@ async def update_draft(draft_id: str, user_id: str, draft_data: DraftCreate):
         raise HTTPException(status_code=500, detail=f"Failed to update draft: {str(e)}")
 
 @router.delete("/generation/drafts/{draft_id}")
-async def delete_draft(draft_id: str, user_id: str):
+async def delete_draft(
+    draft_id: str, 
+    user_id: str = Depends(get_current_user_id),
+    jwt_token: str = Depends(get_jwt_token)
+):
     """Delete a draft"""
     try:
-        generation_service = GenerationService()
+        generation_service = GenerationService(jwt_token)
         await generation_service.delete_draft(draft_id, user_id)
         return {"message": "Draft deleted successfully"}
         

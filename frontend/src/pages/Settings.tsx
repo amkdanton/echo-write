@@ -11,6 +11,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile')
@@ -19,22 +20,42 @@ export default function Settings() {
   ])
 
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   // Fetch user profile
   const { data: profile, isLoading } = useQuery({
     queryKey: ['user-profile'],
     queryFn: async () => {
-      // Mock data for now
-      return {
-        id: '1',
-        email: 'user@example.com',
-        name: 'John Doe',
-        timezone: 'America/New_York',
-        delivery_time: '08:00',
-        language: 'en',
-        voice_traits: ['friendly', 'analytical', 'concise']
+      const { apiService } = await import('../services/api')
+      try {
+        const voiceProfile = await apiService.getVoiceProfile(user?.id || '')
+        return {
+          id: user?.id || '1',
+          email: user?.email || 'user@example.com',
+          name: user?.fullName || user?.email?.split('@')[0] || 'User',
+          timezone: 'America/New_York',
+          delivery_time: '08:00',
+          language: 'en',
+          voice_traits: voiceProfile?.traits || ['friendly', 'analytical', 'concise'],
+          confidence: voiceProfile?.confidence || 0.85,
+          last_trained: voiceProfile?.updated_at ? new Date(voiceProfile.updated_at).toLocaleDateString() : 'Never'
+        }
+      } catch (error) {
+        // Fallback to default values if voice profile doesn't exist
+        return {
+          id: user?.id || '1',
+          email: user?.email || 'user@example.com',
+          name: user?.fullName || user?.email?.split('@')[0] || 'User',
+          timezone: 'America/New_York',
+          delivery_time: '08:00',
+          language: 'en',
+          voice_traits: ['friendly', 'analytical', 'concise'],
+          confidence: 0.85,
+          last_trained: 'Never'
+        }
       }
-    }
+    },
+    enabled: !!user
   })
 
   // Update profile mutation
@@ -52,16 +73,17 @@ export default function Settings() {
   // Train voice mutation
   const trainVoiceMutation = useMutation({
     mutationFn: async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      return { 
-        success: true, 
-        voice_profile: { traits: ['friendly', 'analytical', 'concise'], confidence: 0.85 }
-      }
+      const { apiService } = await import('../services/api')
+      const validSamples = styleSamples.filter(sample => sample.content.trim())
+      return await apiService.trainVoice(user?.id || '', validSamples)
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['user-profile'] })
       setStyleSamples([{ content: '', type: 'newsletter' }])
-      toast.success('Voice trained successfully! 🎉')
+      toast.success(`Voice trained successfully! Confidence: ${Math.round(data.confidence_score * 100)}% 🎉`)
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to train voice: ${error.response?.data?.detail || error.message}`)
     }
   })
 
@@ -244,7 +266,7 @@ export default function Settings() {
                 {profile?.voice_traits && profile.voice_traits.length > 0 ? (
                   <div>
                     <div className="flex flex-wrap gap-3 mb-4">
-                      {profile.voice_traits.map((trait, index) => (
+                      {profile.voice_traits.map((trait: string, index: number) => (
                         <span
                           key={index}
                           className="px-4 py-2 text-sm font-bold bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-full shadow-md animate-pulse"
@@ -254,7 +276,7 @@ export default function Settings() {
                       ))}
                     </div>
                     <p className="text-sm text-green-800 font-medium">
-                      Confidence: <span className="font-bold">85%</span> • Last trained: <span className="font-bold">2 days ago</span>
+                      Confidence: <span className="font-bold">{Math.round((profile?.confidence || 0.85) * 100)}%</span> • Last trained: <span className="font-bold">{profile?.last_trained || 'Never'}</span>
                     </p>
                   </div>
                 ) : (

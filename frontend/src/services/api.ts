@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000, // Increased to 60 seconds for generation
   headers: {
     'Content-Type': 'application/json',
   },
@@ -59,6 +59,7 @@ export const endpoints = {
   deleteSource: (id: string) => `/ingestion/sources/${id}`,
   updateSource: (id: string) => `/ingestion/sources/${id}`,
   getSourceItems: (id: string) => `/ingestion/sources/${id}/items`,
+  getItemsCount: '/ingestion/items/count',
   testSource: (id: string) => `/ingestion/test/${id}`,
   ingestionStatus: '/ingestion/status',
   
@@ -135,6 +136,11 @@ export const apiService = {
     return response.data
   },
 
+  async getItemsCount() {
+    const response = await api.get(endpoints.getItemsCount)
+    return response.data
+  },
+
   async getIngestionStatus() {
     const response = await api.get(endpoints.ingestionStatus)
     return response.data
@@ -170,6 +176,8 @@ export const apiService = {
     const response = await api.post(endpoints.generateNewsletter, {
       trending_items: trendingItems,
       custom_prompt: customPrompt
+    }, {
+      timeout: 120000 // 120 seconds for newsletter generation (can take time with AI)
     })
     return response.data
   },
@@ -207,6 +215,39 @@ export const apiService = {
       draft_id: draftId,
       reaction,
       notes
+    })
+    return response.data
+  },
+
+  async getDraftFeedback(draftId: string) {
+    const response = await api.get(`/feedback/draft/${draftId}`)
+    return response.data
+  },
+
+  // Credits
+  async getUserCredits() {
+    const response = await api.get('/credits')
+    return response.data
+  },
+
+  async getCreditTransactions(limit = 20) {
+    const response = await api.get('/credits/transactions', {
+      params: { limit }
+    })
+    return response.data
+  },
+
+  async checkCreditsForGeneration(requiredCredits = 1) {
+    const response = await api.get('/credits/check', {
+      params: { required_credits: requiredCredits }
+    })
+    return response.data
+  },
+
+  async addCredits(creditAmount: number, description = 'Credit refill') {
+    const response = await api.post('/credits/add', {
+      credit_amount: creditAmount,
+      description
     })
     return response.data
   },

@@ -22,6 +22,39 @@ class StyleService:
         else:
             self.supabase = get_supabase()
     
+    async def train_voice(self, user_id: str, samples: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Train voice model using provided writing samples.
+        This is the main entry point for voice training.
+        """
+        try:
+            # First, add all samples to the database
+            for sample in samples:
+                await self.add_style_sample(
+                    user_id=user_id,
+                    content=sample.content,
+                    title=getattr(sample, 'title', None),
+                    source_type=sample.sample_type
+                )
+            
+            # Then extract voice profile from all samples
+            voice_profile = await self.extract_voice_profile(user_id)
+            
+            # Calculate confidence score based on sample count and characteristics
+            confidence = min(0.95, 0.5 + (len(samples) * 0.1) + (len(voice_profile.get('voice_traits', [])) * 0.05))
+            
+            return {
+                'user_id': user_id,
+                'traits': voice_profile.get('voice_traits', []),
+                'confidence': round(confidence, 2),
+                'created_at': datetime.utcnow().isoformat(),
+                'updated_at': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error training voice: {str(e)}")
+            raise
+
     async def extract_voice_profile(self, user_id: str) -> Dict[str, Any]:
         """
         Extract voice profile from all active style samples for a user.
@@ -270,20 +303,29 @@ class StyleService:
     async def get_voice_profile(self, user_id: str) -> Dict[str, Any]:
         """Get the current voice profile for a user."""
         try:
-            response = self.supabase.table('user_profiles').select('voice_traits').eq('id', user_id).execute()
+            response = self.supabase.table('user_profiles').select('voice_traits, confidence, created_at, updated_at').eq('id', user_id).execute()
             
             if not response.data:
                 return {
                     'user_id': user_id,
-                    'voice_traits': [],
-                    'message': 'No voice profile found. Please add style samples.'
+                    'traits': [],
+                    'confidence': 0.0,
+                    'created_at': datetime.utcnow().isoformat(),
+                    'updated_at': datetime.utcnow().isoformat()
                 }
             
-            voice_traits = response.data[0].get('voice_traits', [])
+            profile_data = response.data[0]
+            voice_traits = profile_data.get('voice_traits', [])
+            confidence = profile_data.get('confidence', 0.0)
+            created_at = profile_data.get('created_at', datetime.utcnow().isoformat())
+            updated_at = profile_data.get('updated_at', datetime.utcnow().isoformat())
             
             return {
                 'user_id': user_id,
-                'voice_traits': voice_traits
+                'traits': voice_traits,  # Map voice_traits to traits
+                'confidence': confidence,
+                'created_at': created_at,
+                'updated_at': updated_at
             }
             
         except Exception as e:
@@ -312,4 +354,25 @@ class StyleService:
             
         except Exception as e:
             logger.error(f"Error toggling sample status: {str(e)}")
+            raise
+
+    async def retrain_voice(self, user_id: str) -> Dict[str, Any]:
+        """Retrain voice profile with existing samples."""
+        try:
+            # Re-extract voice profile from all active samples
+            voice_profile = await self.extract_voice_profile(user_id)
+            
+            # Calculate confidence score
+            confidence = min(0.95, 0.5 + (voice_profile.get('sample_count', 0) * 0.1) + (len(voice_profile.get('voice_traits', [])) * 0.05))
+            
+            return {
+                'user_id': user_id,
+                'traits': voice_profile.get('voice_traits', []),
+                'confidence': round(confidence, 2),
+                'sample_count': voice_profile.get('sample_count', 0),
+                'updated_at': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error retraining voice: {str(e)}")
             raise

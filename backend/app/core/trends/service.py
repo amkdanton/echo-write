@@ -28,7 +28,8 @@ class TrendService:
         """Get trending items for a user within specified time window"""
         try:
             # Get items from user's sources within time window
-            cutoff_time = datetime.utcnow() - timedelta(hours=time_window_hours)
+            from datetime import timezone
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=time_window_hours)
             
             # First get user's sources
             sources_response = self.supabase.table("sources").select("id").eq("user_id", user_id).execute()
@@ -43,6 +44,12 @@ class TrendService:
             ).gte(
                 "published_at", cutoff_time.isoformat()
             ).order("published_at", desc=True).limit(limit * 2).execute()
+            
+            # Convert trend_score to float if it's a string
+            for item_data in response.data:
+                if 'trend_score' in item_data and item_data['trend_score'] is not None:
+                    if isinstance(item_data['trend_score'], str):
+                        item_data['trend_score'] = float(item_data['trend_score'])
             
             items = [Item(**item) for item in response.data]
             
@@ -62,8 +69,19 @@ class TrendService:
         """Calculate comprehensive trend score for an item"""
         try:
             # 1. Recency Score (40% weight)
-            published_at = datetime.fromisoformat(item.published_at.replace('Z', '+00:00'))
-            hours_ago = (datetime.utcnow() - published_at).total_seconds() / 3600
+            # Handle both string and datetime types for published_at
+            if isinstance(item.published_at, str):
+                published_at = datetime.fromisoformat(item.published_at.replace('Z', '+00:00'))
+            else:
+                published_at = item.published_at
+            
+            # Make both datetimes timezone-aware for comparison
+            from datetime import timezone
+            now_utc = datetime.now(timezone.utc)
+            if published_at.tzinfo is None:
+                published_at = published_at.replace(tzinfo=timezone.utc)
+            
+            hours_ago = (now_utc - published_at).total_seconds() / 3600
             
             # Exponential decay with different time windows
             if hours_ago <= 1:
@@ -106,6 +124,7 @@ class TrendService:
             
         except Exception as e:
             logger.error(f"Error calculating trend score: {e}")
+            logger.error(f"Item data: id={item.id}, title={item.title}, published_at={item.published_at}, type={type(item.published_at)}")
             return 0.5  # Default score
     
     def _calculate_content_quality(self, item: Item) -> float:
@@ -230,7 +249,13 @@ class TrendService:
             if not response.data:
                 raise ValueError(f"Item {item_id} not found")
             
-            item = Item(**response.data[0])
+            # Convert trend_score to float if it's a string
+            item_data = response.data[0]
+            if 'trend_score' in item_data and item_data['trend_score'] is not None:
+                if isinstance(item_data['trend_score'], str):
+                    item_data['trend_score'] = float(item_data['trend_score'])
+            
+            item = Item(**item_data)
             return await self._calculate_trend_score(item)
             
         except Exception as e:
@@ -239,7 +264,8 @@ class TrendService:
     
     async def recalculate_all_scores(self, user_id: str) -> Dict[str, Any]:
         """Recalculate trend scores for all items from user's sources"""
-        start_time = datetime.utcnow()
+        from datetime import timezone
+        start_time = datetime.now(timezone.utc)
         
         try:
             # Get all items from user's sources
@@ -247,6 +273,12 @@ class TrendService:
                 *,
                 sources!inner(user_id)
             """).eq("sources.user_id", user_id).execute()
+            
+            # Convert trend_score to float if it's a string
+            for item_data in response.data:
+                if 'trend_score' in item_data and item_data['trend_score'] is not None:
+                    if isinstance(item_data['trend_score'], str):
+                        item_data['trend_score'] = float(item_data['trend_score'])
             
             items = [Item(**item) for item in response.data]
             processed_count = 0
@@ -258,12 +290,12 @@ class TrendService:
                 # Update in database
                 self.supabase.table("items").update({
                     "trend_score": new_score,
-                    "updated_at": datetime.utcnow().isoformat()
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }).eq("id", item.id).execute()
                 
                 processed_count += 1
             
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             time_taken = (end_time - start_time).total_seconds()
             
             return {

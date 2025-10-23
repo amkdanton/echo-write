@@ -8,29 +8,37 @@ import {
   EyeIcon,
   SparklesIcon,
   ChartBarIcon,
-  ClockIcon
+  ClockIcon,
+  XMarkIcon,
+  EnvelopeIcon,
+  BookOpenIcon
 } from '@heroicons/react/24/outline'
 import { apiService } from '../services/api'
 import toast from 'react-hot-toast'
 import NewsletterGenerationLoader from '../components/NewsletterGenerationLoader'
+import CreditDisplay from '../components/CreditDisplay'
+import NewsletterRenderer from '../components/NewsletterRenderer'
 
 export default function Dashboard() {
   const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedDraft, setSelectedDraft] = useState<any>(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   // Fetch dashboard data
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      // Fetch sources and drafts to calculate stats
-      const [sources, drafts] = await Promise.all([
+      // Fetch sources, drafts, and items count to calculate stats
+      const [sources, drafts, itemsCount] = await Promise.all([
         apiService.getSources(),
-        apiService.getDrafts()
+        apiService.getDrafts(),
+        apiService.getItemsCount()
       ])
       
       return {
         totalSources: sources.length,
         activeSources: sources.filter((s: any) => s.is_active).length,
-        totalItems: 0, // Will be calculated from items table
+        totalItems: itemsCount.count || 0,
         draftsGenerated: drafts.length,
         lastGeneration: drafts.length > 0 ? drafts[0].created_at : null
       }
@@ -44,7 +52,26 @@ export default function Dashboard() {
     }
   })
 
+  // Get user credits from API
+  const { data: userCredits, isLoading: creditsLoading } = useQuery({
+    queryKey: ['user-credits'],
+    queryFn: async () => {
+      return await apiService.getUserCredits()
+    }
+  })
+
   const handleGenerateNow = async () => {
+    // Check credits first
+    if (userCredits && userCredits.credits <= 0) {
+      toast.error('You have no credits remaining. Please contact support for more credits.')
+      return
+    }
+    
+    if (userCredits && userCredits.credits <= 2) {
+      toast.error(`You have only ${userCredits.credits} credits remaining. Consider upgrading for more credits.`)
+      return
+    }
+
     setIsGenerating(true)
     try {
       const sources = await apiService.getSources()
@@ -65,9 +92,17 @@ export default function Dashboard() {
       
       if (result.success) {
         console.log('Newsletter generated:', result)
+        // Show credit update
+        if (result.credits_remaining !== undefined) {
+          toast.success(`Newsletter generated! ${result.credits_remaining} credits remaining.`)
+        }
         // Loader will show completion and then redirect
       } else {
-        toast.error(result.message || 'Generation failed')
+        if (result.error === 'insufficient_credits') {
+          toast.error(result.message || 'Insufficient credits for generation')
+        } else {
+          toast.error(result.message || 'Generation failed')
+        }
         setIsGenerating(false)
       }
     } catch (error: any) {
@@ -82,6 +117,11 @@ export default function Dashboard() {
     setTimeout(() => {
       window.location.reload()
     }, 500)
+  }
+
+  const handlePreview = (draft: any) => {
+    setSelectedDraft(draft)
+    setShowPreview(true)
   }
 
   if (isLoading) {
@@ -132,6 +172,16 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Credit Display */}
+      {userCredits && (
+        <CreditDisplay 
+          credits={userCredits.credits}
+          totalGenerations={userCredits.totalGenerations}
+          isLoading={creditsLoading}
+          showWarning={true}
+        />
+      )}
 
       {/* Stats Cards with gradients and animations */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -215,7 +265,11 @@ export default function Dashboard() {
                       }`}>
                         {draft.status === 'sent' ? '✓ Sent' : draft.status === 'published' ? '📡 Published' : '📝 Draft'}
                       </span>
-                      <button className="p-3 bg-blue-100 text-blue-600 hover:bg-gradient-to-br hover:from-blue-500 hover:to-purple-600 hover:text-white rounded-xl transition-all duration-300 transform hover:scale-110">
+                      <button 
+                        onClick={() => handlePreview(draft)}
+                        className="p-3 bg-blue-100 text-blue-600 hover:bg-gradient-to-br hover:from-blue-500 hover:to-purple-600 hover:text-white rounded-xl transition-all duration-300 transform hover:scale-110"
+                        title="Preview newsletter"
+                      >
                         <EyeIcon className="h-5 w-5" />
                       </button>
                     </div>
@@ -250,6 +304,14 @@ export default function Dashboard() {
         isOpen={isGenerating} 
         onComplete={handleGenerationComplete}
       />
+
+      {/* Preview Modal */}
+      {showPreview && selectedDraft && (
+        <NewsletterPreviewModal
+          draft={selectedDraft}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
     </div>
   )
 }
@@ -292,6 +354,106 @@ function StatsCard({ icon, label, value, total, gradient, delay, isDate }: Stats
       <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-gradient-to-br opacity-10 group-hover:opacity-20 transition-opacity duration-300"
         style={{ backgroundImage: `linear-gradient(to bottom right, var(--tw-gradient-stops))` }}
       ></div>
+    </div>
+  )
+}
+
+// Newsletter Preview Modal Component
+function NewsletterPreviewModal({ 
+  draft, 
+  onClose
+}: { 
+  draft: any
+  onClose: () => void
+}) {
+
+  // Calculate reading time
+  const wordCount = draft.body_md.split(/\s+/).length
+  const readingTime = Math.ceil(wordCount / 200)
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-hidden flex flex-col relative">
+        {/* Top gradient bar */}
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-6 flex items-center justify-between relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10"></div>
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
+              <SparklesIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Newsletter Preview</h3>
+              <p className="text-slate-300 text-sm">AI-Generated Content Preview</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 relative z-10">
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all duration-200"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-white">
+          {/* Email Header Preview */}
+          <div className="bg-gradient-to-r from-slate-800 to-slate-700 p-8 text-center text-white relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20" />
+            <div className="relative z-10">
+              <h1 className="text-3xl font-bold mb-3 bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
+                {draft.title}
+              </h1>
+              <p className="text-slate-300 text-lg mb-6">
+                Your curated weekly pulse of innovation, hand-picked and written by AI — reviewed by humans.
+              </p>
+              <div className="flex items-center justify-center gap-8 text-slate-300">
+                <div className="flex items-center gap-2">
+                  <ClockIcon className="h-5 w-5" />
+                  <span className="font-medium">{new Date(draft.created_at).toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BookOpenIcon className="h-5 w-5" />
+                  <span className="font-medium">{readingTime} min read</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Email Subject Preview */}
+          {draft.generation_metadata?.email_subject && (
+            <div className="mx-8 -mt-4 mb-8">
+              <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <EnvelopeIcon className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Email Subject</span>
+                </div>
+                <p className="text-slate-800 font-medium text-lg">{draft.generation_metadata.email_subject}</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Newsletter Content using unified component */}
+          <div className="px-8 pb-8">
+            <NewsletterRenderer 
+              content={draft.body_md} 
+              variant="preview"
+              className="bg-transparent shadow-none border-none p-0"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

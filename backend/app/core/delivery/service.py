@@ -59,7 +59,8 @@ class DeliveryService:
             email_html = get_newsletter_html_template(
                 newsletter_title=newsletter_title,
                 newsletter_body_html=newsletter_body_html,
-                unsubscribe_url="#"  # TODO: Implement unsubscribe functionality
+                unsubscribe_url="#",  # TODO: Implement unsubscribe functionality
+                draft_id=draft_id
             )
             
             # Send email via Resend

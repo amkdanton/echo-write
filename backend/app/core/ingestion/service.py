@@ -399,6 +399,23 @@ class IngestionService:
             logger.error(f"Error getting items for source {source_id}: {e}")
             raise
     
+    async def get_items_count(self, user_id: str) -> int:
+        """Get total count of items for the user"""
+        try:
+            # Get all sources for the user
+            sources_response = self.supabase.table("sources").select("id").eq("user_id", user_id).execute()
+            source_ids = [source["id"] for source in sources_response.data]
+            
+            if not source_ids:
+                return 0
+            
+            # Count items from all user's sources
+            response = self.supabase.table("items").select("id", count="exact").in_("source_id", source_ids).execute()
+            return response.count or 0
+        except Exception as e:
+            logger.error(f"Error getting items count for user {user_id}: {e}")
+            return 0
+
     async def get_status(self) -> Dict[str, Any]:
         """Get ingestion service status"""
         return {

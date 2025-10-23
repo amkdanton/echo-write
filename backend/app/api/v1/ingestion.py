@@ -134,6 +134,19 @@ async def get_source_items(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get items: {str(e)}")
 
+@router.get("/ingestion/items/count")
+async def get_items_count(
+    user_id: str = Depends(get_current_user_id),
+    jwt_token: str = Depends(get_jwt_token)
+):
+    """Get total count of items for the user"""
+    try:
+        ingestion_service = IngestionService(jwt_token)
+        count = await ingestion_service.get_items_count(user_id)
+        return {"count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get items count: {str(e)}")
+
 @router.get("/ingestion/status")
 async def get_ingestion_status():
     """Get current ingestion status and queue information"""

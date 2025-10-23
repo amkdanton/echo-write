@@ -1,11 +1,14 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import { 
   HomeIcon, 
   RssIcon, 
   DocumentTextIcon, 
   CogIcon,
   ArrowRightOnRectangleIcon,
-  SparklesIcon
+  SparklesIcon,
+  Bars3Icon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -19,16 +22,36 @@ const navigation = [
 export default function Layout() {
   const location = useLocation()
   const { user, signOut } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-sm flex flex-col">
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-sm flex flex-col transform transition-transform duration-300 ease-in-out lg:static lg:inset-0 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
-            <div className="flex flex-shrink-0 items-center px-4 gap-2">
-              <SparklesIcon className="h-8 w-8 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-900">EchoWrite</h1>
+            <div className="flex flex-shrink-0 items-center justify-between px-4 gap-2">
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="h-8 w-8 text-blue-600" />
+                <h1 className="text-xl font-bold text-gray-900">EchoWrite</h1>
+              </div>
+              {/* Close button for mobile */}
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
             </div>
             <nav className="mt-8 flex-1 space-y-1 px-2">
               {navigation.map((item) => {
@@ -87,19 +110,28 @@ export default function Layout() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white border-b border-gray-200 px-8 py-4">
+      <div className="flex-1 flex flex-col lg:ml-0">
+        <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800">
-              {location.pathname === '/dashboard' && 'Dashboard'}
-              {location.pathname === '/sources' && 'Content Sources'}
-              {location.pathname === '/drafts' && 'Newsletter Drafts'}
-              {location.pathname === '/settings' && 'Settings'}
-            </h2>
+            <div className="flex items-center gap-4">
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              >
+                <Bars3Icon className="h-6 w-6" />
+              </button>
+              <h2 className="text-xl font-semibold text-gray-800">
+                {location.pathname === '/dashboard' && 'Dashboard'}
+                {location.pathname === '/sources' && 'Content Sources'}
+                {location.pathname === '/drafts' && 'Newsletter Drafts'}
+                {location.pathname === '/settings' && 'Settings'}
+              </h2>
+            </div>
           </div>
         </header>
         
-        <main className="flex-1 p-8 bg-gray-50 overflow-auto">
+        <main className="flex-1 p-4 lg:p-8 bg-gray-50 overflow-auto">
           <Outlet />
         </main>
       </div>
